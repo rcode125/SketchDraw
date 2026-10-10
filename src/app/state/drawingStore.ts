@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type DrawingTool = 'brush' | 'eraser'
+export type DrawingTool = 'pencil' | 'brush' | 'charcoal' | 'marker' | 'eraser'
 
 export interface Point {
   x: number
@@ -11,6 +11,7 @@ export interface Stroke {
   points: Point[]
   color: string // hex color
   size: number // radius in pixels
+  tool: DrawingTool
 }
 
 export interface DrawingState {
@@ -22,6 +23,7 @@ export interface DrawingState {
     points: Point[]
     color: string
     size: number
+    tool: DrawingTool
   } | null
   // actions
   setTool: (tool: DrawingTool) => void
@@ -34,7 +36,7 @@ export interface DrawingState {
 }
 
 export const useDrawingStore = create<DrawingState>((set, get) => ({
-  tool: 'brush',
+  tool: 'pencil',
   color: '#000000',
   size: 5,
   strokes: [],
@@ -49,6 +51,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => ({
         points: [point],
         color: state.color,
         size: state.size,
+        tool: state.tool,
       },
     })
   },

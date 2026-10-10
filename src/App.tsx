@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SketchCanvas } from './features/canvas/SketchCanvas'
 import { ColorPicker } from './features/canvas/ColorPicker'
+import { ToolPicker } from './features/canvas/ToolPicker'
 import { useUiStore } from './app/state/uiStore'
 import './App.css'
 
@@ -11,7 +12,7 @@ export const App = () => {
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth - 40
-      const height = window.innerHeight - 120
+      const height = window.innerHeight - 160
       setCanvasSize({ width, height })
     }
     handleResize()
@@ -28,6 +29,7 @@ export const App = () => {
       <header className="workspace__header">
         <h1>SketchDraw</h1>
       </header>
+      <ToolPicker />
       <div className="workspace__canvas">
         <SketchCanvas width={canvasSize.width} height={canvasSize.height} />
       </div>

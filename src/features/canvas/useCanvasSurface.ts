@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useDrawingStore } from '../../app/state/drawingStore'
+import { useDrawingStore, type DrawingTool, type Point } from '../../app/state/drawingStore'
 
 interface UseCanvasSurfaceOptions {
   width: number
@@ -62,19 +62,51 @@ export const useCanvasSurface = (
     ctx.fillStyle = backgroundColor
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Draw all the strokes
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-
-    for (const stroke of strokes) {
+    const drawStroke = (stroke: {
+      points: Point[]
+      color: string
+      size: number
+      tool: DrawingTool
+    }) => {
       ctx.strokeStyle = stroke.color
-      ctx.lineWidth = stroke.size * 2 // size is radius, line width is diameter
+      const baseWidth = stroke.size * 2
+
+      switch (stroke.tool) {
+        case 'pencil':
+          ctx.lineCap = 'butt'
+          ctx.lineJoin = 'miter'
+          ctx.lineWidth = Math.max(1, baseWidth * 0.5)
+          break
+        case 'brush':
+          ctx.lineCap = 'round'
+          ctx.lineJoin = 'round'
+          ctx.lineWidth = baseWidth
+          break
+        case 'charcoal':
+          ctx.lineCap = 'round'
+          ctx.lineJoin = 'round'
+          ctx.lineWidth = baseWidth * 1.5
+          ctx.globalAlpha = 0.6
+          break
+        case 'marker':
+          ctx.lineCap = 'square'
+          ctx.lineJoin = 'miter'
+          ctx.lineWidth = baseWidth * 2
+          ctx.globalAlpha = 0.8
+          break
+        case 'eraser':
+          ctx.lineCap = 'round'
+          ctx.lineJoin = 'round'
+          ctx.lineWidth = baseWidth * 3
+          ctx.globalCompositeOperation = 'destination-out'
+          break
+      }
 
       const points = stroke.points
-      if (points.length < 2) continue
+      if (points.length < 2) return
 
       const firstPoint = points[0]
-      if (!firstPoint) continue
+      if (!firstPoint) return
 
       ctx.beginPath()
       ctx.moveTo(firstPoint.x, firstPoint.y)
@@ -82,23 +114,17 @@ export const useCanvasSurface = (
         ctx.lineTo(point.x, point.y)
       }
       ctx.stroke()
+
+      ctx.globalAlpha = 1
+      ctx.globalCompositeOperation = 'source-over'
     }
 
-    // Draw the current stroke if it exists
+    for (const stroke of strokes) {
+      drawStroke(stroke)
+    }
+
     if (currentStroke) {
-      ctx.strokeStyle = currentStroke.color
-      ctx.lineWidth = currentStroke.size * 2
-      const points = currentStroke.points
-      if (points.length >= 2) {
-        const firstPoint = points[0]
-        if (!firstPoint) return
-        ctx.beginPath()
-        ctx.moveTo(firstPoint.x, firstPoint.y)
-        for (const point of points.slice(1)) {
-          ctx.lineTo(point.x, point.y)
-        }
-        ctx.stroke()
-      }
+      drawStroke(currentStroke)
     }
   }, [strokes, currentStroke, backgroundColor, canvasRef])
 
