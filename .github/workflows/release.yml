@@ -1,0 +1,168 @@
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            build_script: build:linux
+            artifact_name: linux
+            asset_pattern: |
+              dist/*.AppImage
+              dist/*.deb
+          - os: windows-latest
+            build_script: build:win
+            artifact_name: windows
+            asset_pattern: |
+              dist/*.exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run ${{ matrix.build_script }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-build
+          path: |
+            ${{ matrix.asset_pattern }}
+          retention-days: 1
+
+  generate-release-notes:
+    name: Generate Release Notes (AI)
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_notes: ${{ steps.generate.outputs.notes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit history since last tag
+        id: commits
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            git log --pretty=format:"- %s (%an)" $LAST_TAG..HEAD > /tmp/commits.txt
+          else
+            git log --pretty=format:"- %s (%an)" > /tmp/commits.txt
+          fi
+          cat /tmp/commits.txt
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/commits.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes with Ollama
+        id: generate
+        env:
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_CLOUD_KEY }}
+        run: |
+          COMMITS=$(cat <<'EOF'
+          ${{ steps.commits.outputs.commits }}
+          EOF
+          )
+
+          PROMPT=$(cat <<'PROMPTEOF'
+          You are a release notes generator for a cross-platform desktop drawing application (Electron + React + TypeScript).
+
+          Generate concise, user-friendly release notes from the following commit history.
+
+          Format as markdown with these sections:
+          ## What's New
+          - Group commits by category (Features, Fixes, Improvements, Docs, Chore)
+          - Use clear, non-technical language for end users
+          - Keep each bullet to one line
+
+          ## Downloads
+          - Windows: .exe installer and portable
+          - Linux: .AppImage and .deb
+
+          Commit history:
+          PROMPTEOF
+          )
+
+          PAYLOAD=$(jq -n \
+            --arg model "gpt-oss:120b-cloud" \
+            --arg prompt "$PROMPT$COMMITS" \
+            --argjson stream false \
+            --argjson options '{"temperature": 0.3, "num_predict": 2048}' \
+            '{model: $model, prompt: $prompt, stream: $stream, options: $options}')
+
+          RESPONSE=$(curl -s -X POST "https://api.ollama.com/api/generate" \
+            -H "Authorization: Bearer $OLLAMA_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+
+          NOTES=$(echo "$RESPONSE" | jq -r '.response // empty')
+
+          if [ -z "$NOTES" ]; then
+            echo "⚠️ Ollama API returned empty response, falling back to auto-generated notes"
+            echo "notes=Auto-generated release notes for ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            # Escape for GitHub output
+            echo "$NOTES" | sed 's/%/%25/g; s/\n/%0A/g; s/\r/%0D/g' > /tmp/notes_encoded.txt
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            cat /tmp/notes_encoded.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+  release:
+    name: Create Release
+    needs: [build, generate-release-notes]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: |
+          find artifacts -type f -name "*" | sort
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body: ${{ needs.generate-release-notes.outputs.release_notes }}
+          files: |
+            artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
