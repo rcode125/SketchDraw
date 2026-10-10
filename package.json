@@ -1,0 +1,81 @@
+{
+  "name": "sketchdraw",
+  "productName": "SketchDraw",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A cross-platform desktop drawing application built with Electron, React, and TypeScript.",
+  "author": "SketchDraw Contributors <contributors@sketchdraw.example>",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist-electron/index.js",
+  "scripts": {
+    "dev": "vite",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:renderer": "vite build",
+    "build": "npm run typecheck && npm run build:renderer && electron-builder --publish never",
+    "build:linux": "npm run typecheck && npm run build:renderer && electron-builder --linux AppImage deb --publish never",
+    "build:win": "npm run typecheck && npm run build:renderer && electron-builder --win nsis portable --publish never"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@typescript-eslint/eslint-plugin": "^8.45.0",
+    "@typescript-eslint/parser": "^8.45.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^3.2.4",
+    "electron": "^37.10.3",
+    "electron-builder": "^26.0.12",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.23",
+    "globals": "^16.4.0",
+    "jsdom": "^27.0.1",
+    "prettier": "^3.6.2",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^3.2.4"
+  },
+  "build": {
+    "appId": "com.sketchdraw.app",
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Graphics"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  }
+}
