@@ -1,30 +1,38 @@
 import { useEffect, useState } from 'react'
 import { SketchCanvas } from './features/canvas/SketchCanvas'
-import type { AppInfo } from './shared/types/ipc'
+import { ColorPicker } from './features/canvas/ColorPicker'
 import { useUiStore } from './app/state/uiStore'
+import './App.css'
 
-const App = () => {
-  const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
-  const { canvasSize } = useUiStore()
+export const App = () => {
+  const [canvasSize, setCanvasSize] = useState({ width: 1280, height: 720 })
+  const setCanvasSizeStore = useUiStore((state) => state.setCanvasSize)
 
   useEffect(() => {
-    void window.sketchdraw.getAppInfo().then(setAppInfo)
+    const handleResize = () => {
+      const width = window.innerWidth - 40
+      const height = window.innerHeight - 120
+      setCanvasSize({ width, height })
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  useEffect(() => {
+    setCanvasSizeStore(canvasSize)
+  }, [canvasSize, setCanvasSizeStore])
+
   return (
-    <main className="workspace">
+    <div className="workspace">
       <header className="workspace__header">
-        <div>
-          <h1>SketchDraw</h1>
-          <p className="workspace__meta">
-            {appInfo ? `${appInfo.platform} • v${appInfo.version}` : 'Desktop workspace'}
-          </p>
-        </div>
+        <h1>SketchDraw</h1>
       </header>
-      <section className="workspace__canvas">
+      <div className="workspace__canvas">
         <SketchCanvas width={canvasSize.width} height={canvasSize.height} />
-      </section>
-    </main>
+      </div>
+      <ColorPicker />
+    </div>
   )
 }
 
