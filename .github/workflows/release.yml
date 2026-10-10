@@ -78,19 +78,18 @@ jobs:
             git log --pretty=format:"- %s (%an)" > /tmp/commits.txt
           fi
           cat /tmp/commits.txt
-          echo "commits<<EOF" >> $GITHUB_OUTPUT
-          cat /tmp/commits.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo 'commits<<COMMITS_EOF'
+            cat /tmp/commits.txt
+            echo 'COMMITS_EOF'
+          } >> $GITHUB_OUTPUT
 
       - name: Generate release notes with Ollama
         id: generate
         env:
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_CLOUD_KEY }}
         run: |
-          COMMITS=$(cat <<'EOF'
-          ${{ steps.commits.outputs.commits }}
-          EOF
-          )
+          COMMITS="${{ steps.commits.outputs.commits }}"
 
           PROMPT=$(cat <<'PROMPTEOF'
           You are a release notes generator for a cross-platform desktop drawing application (Electron + React + TypeScript).
@@ -131,9 +130,11 @@ jobs:
           else
             # Escape for GitHub output
             echo "$NOTES" | sed 's/%/%25/g; s/\n/%0A/g; s/\r/%0D/g' > /tmp/notes_encoded.txt
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            cat /tmp/notes_encoded.txt >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            {
+              echo 'notes<<NOTES_EOF'
+              cat /tmp/notes_encoded.txt
+              echo 'NOTES_EOF'
+            } >> $GITHUB_OUTPUT
           fi
 
   release:
