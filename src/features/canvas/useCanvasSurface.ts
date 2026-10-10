@@ -17,19 +17,15 @@ export const useCanvasSurface = (
   { width, height, backgroundColor = '#ffffff' }: UseCanvasSurfaceOptions,
 ) => {
   // Subscribe to the drawing store for strokes, currentStroke, and the methods we need.
-  const {
-    strokes,
-    currentStroke,
-    startStroke,
-    addPoint,
-    endStroke,
-  } = useDrawingStore(useShallow(state => ({
-    strokes: state.strokes,
-    currentStroke: state.currentStroke,
-    startStroke: state.startStroke,
-    addPoint: state.addPoint,
-    endStroke: state.endStroke,
-  })))
+  const { strokes, currentStroke, startStroke, addPoint, endStroke } = useDrawingStore(
+    useShallow((state) => ({
+      strokes: state.strokes,
+      currentStroke: state.currentStroke,
+      startStroke: state.startStroke,
+      addPoint: state.addPoint,
+      endStroke: state.endStroke,
+    })),
+  )
 
   // Set up canvas size and background when dimensions or background color change
   useEffect(() => {

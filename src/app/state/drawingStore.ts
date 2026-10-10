@@ -1,36 +1,36 @@
-import { create } from 'zustand';
+import { create } from 'zustand'
 
-export type DrawingTool = 'brush' | 'eraser';
+export type DrawingTool = 'brush' | 'eraser'
 
 export interface Point {
-  x: number;
-  y: number;
+  x: number
+  y: number
 }
 
 export interface Stroke {
-  points: Point[];
-  color: string; // hex color
-  size: number; // radius in pixels
+  points: Point[]
+  color: string // hex color
+  size: number // radius in pixels
 }
 
 export interface DrawingState {
-  tool: DrawingTool;
-  color: string; // current color
-  size: number; // current size
-  strokes: Stroke[];
+  tool: DrawingTool
+  color: string // current color
+  size: number // current size
+  strokes: Stroke[]
   currentStroke: {
-    points: Point[];
-    color: string;
-    size: number;
-  } | null;
+    points: Point[]
+    color: string
+    size: number
+  } | null
   // actions
-  setTool: (tool: DrawingTool) => void;
-  setColor: (color: string) => void;
-  setSize: (size: number) => void;
-  startStroke: (point: Point) => void;
-  addPoint: (point: Point) => void;
-  endStroke: () => void;
-  clearStrokes: () => void;
+  setTool: (tool: DrawingTool) => void
+  setColor: (color: string) => void
+  setSize: (size: number) => void
+  startStroke: (point: Point) => void
+  addPoint: (point: Point) => void
+  endStroke: () => void
+  clearStrokes: () => void
 }
 
 export const useDrawingStore = create<DrawingState>((set, get) => ({
@@ -43,38 +43,38 @@ export const useDrawingStore = create<DrawingState>((set, get) => ({
   setColor: (color) => set({ color }),
   setSize: (size) => set({ size }),
   startStroke: (point) => {
-    const state = get();
+    const state = get()
     set({
       currentStroke: {
         points: [point],
         color: state.color,
         size: state.size,
       },
-    });
+    })
   },
   addPoint: (point) => {
     set((state) => {
       if (!state.currentStroke) {
-        return state;
+        return state
       }
       return {
         currentStroke: {
           ...state.currentStroke,
           points: [...state.currentStroke.points, point],
         },
-      };
-    });
+      }
+    })
   },
   endStroke: () => {
     set((state) => {
       if (!state.currentStroke) {
-        return state;
+        return state
       }
-      const newStrokes = [...state.strokes, state.currentStroke];
-      return { strokes: newStrokes, currentStroke: null };
-    });
+      const newStrokes = [...state.strokes, state.currentStroke]
+      return { strokes: newStrokes, currentStroke: null }
+    })
   },
   clearStrokes: () => {
-    set({ strokes: [], currentStroke: null });
+    set({ strokes: [], currentStroke: null })
   },
-}));
+}))
