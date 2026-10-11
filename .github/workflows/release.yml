@@ -35,14 +35,14 @@ jobs:
             build_script: build:linux
             artifact_name: linux
             asset_pattern: |
-              dist/*.AppImage
-              dist/*.deb
+              release/*.AppImage
+              release/*.deb
 
           - os: windows-latest
             build_script: build:win
             artifact_name: windows
             asset_pattern: |
-              dist/*.exe
+              release/*.exe
 
     steps:
       - name: Checkout repository
@@ -107,12 +107,12 @@ jobs:
           run: |
             set -euo pipefail
 
-            mkdir -p dist
+            mkdir -p release
 
             echo "Searching for generated Windows executables..."
 
             while IFS= read -r -d '' file; do
-              destination="dist/$(basename \"$file\")"
+              destination="release/$(basename \"$file\")"
 
               # Avoid copying files onto themselves.
               if [ "$(realpath \"$file\")" != "$(realpath -m \"$destination\")" ]; then
@@ -125,14 +125,14 @@ jobs:
                 -iname '*.exe' \
                 -not -path './node_modules/*' \
                 -not -path './.git/*' \
-                -not -path './dist/*' \
+                -not -path './release/*' \
                 -print0
             )
 
             echo "Collected executables:"
-            find dist -maxdepth 1 -type f -iname '*.exe' -print
+            find release -maxdepth 1 -type f -iname '*.exe' -print
 
-            if ! find dist -maxdepth 1 -type f -iname '*.exe' -print -quit | grep -q .; then
+            if ! find release -maxdepth 1 -type f -iname '*.exe' -print -quit | grep -q .; then
               echo "::error::No Windows executables were generated anywhere in the repository."
               exit 1
             fi
@@ -144,8 +144,8 @@ jobs:
           run: |
             set -euo pipefail
 
-            if [ ! -d dist ]; then
-              echo "::error::The dist directory does not exist."
+            if [ ! -d release ]; then
+              echo "::error::The release directory does not exist."
               exit 1
             fi
 
@@ -417,9 +417,9 @@ jobs:
           fi
 
           echo "Downloaded files:"
-          find artifacts -maxdepth 1 -type f -print | sort
+          find artifacts -type f -print | sort
 
-          if ! find artifacts -maxdepth 1 -type f -print -quit | grep -q .; then
+          if ! find artifacts -type f -print -quit | grep -q .; then
             echo "::error::No release artifacts were downloaded."
             exit 1
           fi
