@@ -71,18 +71,20 @@ jobs:
       - name: Get commit history since last tag
         id: commits
         run: |
+          set -euo pipefail
+
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           if [ -n "$LAST_TAG" ]; then
-            git log --pretty=format:"- %s (%an)" $LAST_TAG..HEAD > /tmp/commits.txt
+            git log --pretty=format:"- %s (%an)" "$LAST_TAG"..HEAD > /tmp/commits.txt
           else
             git log --pretty=format:"- %s (%an)" > /tmp/commits.txt
           fi
           cat /tmp/commits.txt
           {
-            echo "commits<<COMMITS_EOF"
+            echo "commits<<EOF"
             cat /tmp/commits.txt
-            echo "COMMITS_EOF"
-          } >> $GITHUB_OUTPUT
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes with Ollama
         id: generate
@@ -126,15 +128,15 @@ jobs:
 
           if [ -z "$NOTES" ]; then
             echo "⚠️ Ollama API returned empty response, falling back to auto-generated notes"
-            echo "notes=Auto-generated release notes for ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "notes=Auto-generated release notes for ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           else
             # Escape for GitHub output
             echo "$NOTES" | sed 's/%/%25/g; s/\n/%0A/g; s/\r/%0D/g' > /tmp/notes_encoded.txt
             {
-              echo 'notes<<NOTES_EOF'
+              echo "notes<<EOF"
               cat /tmp/notes_encoded.txt
-              echo 'NOTES_EOF'
-            } >> $GITHUB_OUTPUT
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           fi
 
   release:
