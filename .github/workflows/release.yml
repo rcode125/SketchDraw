@@ -80,12 +80,9 @@ jobs:
             git log --pretty=format:"- %s (%an)" > /tmp/commits.txt
           fi
           cat /tmp/commits.txt
-          {
-            echo "commits<<EOF"
-            cat /tmp/commits.txt
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
+            echo "commits<<EOF" >> "$GITHUB_OUTPUT"
+            cat /tmp/commits.txt >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
       - name: Generate release notes with Ollama
         id: generate
         env:
