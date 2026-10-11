@@ -3,15 +3,30 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (for example v1.2.0)"
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   build:
     name: Build ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: read
+
     strategy:
       fail-fast: false
       matrix:
@@ -22,6 +37,7 @@ jobs:
             asset_pattern: |
               dist/*.AppImage
               dist/*.deb
+
           - os: windows-latest
             build_script: build:win
             artifact_name: windows
@@ -37,131 +53,336 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: npm
+
+      - name: Verify project configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f package.json ]; then
+            echo "::error::package.json was not found."
+            exit 1
+          fi
+
+          if [ ! -f package-lock.json ]; then
+            echo "::error::package-lock.json is missing. npm ci requires a lockfile."
+            exit 1
+          fi
+
+          node --version
+          npm --version
+
+          npm run
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build application
-        run: npm run ${{ matrix.build_script }}
+        run: npm run "${{ matrix.build_script }}"
 
-      - name: Upload artifacts
+      - name: Validate build artifacts
+        shell: bash
+        env:
+          ASSET_PATTERNS: ${{ matrix.asset_pattern }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -d dist ]; then
+            echo "::error::The dist directory does not exist."
+            exit 1
+          fi
+
+          shopt -s nullglob
+
+          found=0
+
+          while IFS= read -r pattern; do
+            [ -n "$pattern" ] || continue
+
+            # Expand the expected file pattern.
+            matches=( $pattern )
+
+            if [ "${#matches[@]}" -eq 0 ]; then
+              echo "::error::No build artifacts found for pattern: $pattern"
+              exit 1
+            fi
+
+            for file in "${matches[@]}"; do
+              if [ -f "$file" ]; then
+                echo "Found artifact: $file"
+                found=$((found + 1))
+              fi
+            done
+          done <<< "$ASSET_PATTERNS"
+
+          if [ "$found" -eq 0 ]; then
+            echo "::error::The build produced no valid release artifacts."
+            exit 1
+          fi
+
+          echo "Validated $found artifact(s)."
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}-build
-          path: |
-            ${{ matrix.asset_pattern }}
-          retention-days: 1
+          path: ${{ matrix.asset_pattern }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
 
   generate-release-notes:
-    name: Generate Release Notes (AI)
+    name: Generate Release Notes
     needs: build
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
+
     outputs:
       release_notes: ${{ steps.generate.outputs.notes }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get commit history since last tag
-        id: commits
+      - name: Generate release notes
+        id: generate
+        shell: bash
+        env:
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_CLOUD_KEY }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -n "$LAST_TAG" ]; then
-            git log --pretty=format:"- %s (%an)" "$LAST_TAG"..HEAD > /tmp/commits.txt
-          else
-            git log --pretty=format:"- %s (%an)" > /tmp/commits.txt
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          COMMITS_FILE="$RUNNER_TEMP/commits.txt"
+          RESPONSE_FILE="$RUNNER_TEMP/ollama-response.json"
+
+          # Find the previous reachable tag.
+          LAST_TAG=""
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            git fetch --force origin \
+              "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+
+            RELEASE_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
           fi
-          cat /tmp/commits.txt
-            echo "commits<<EOF" >> "$GITHUB_OUTPUT"
-            cat /tmp/commits.txt >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-      - name: Generate release notes with Ollama
-        id: generate
-        env:
-          OLLAMA_API_KEY: ${{ secrets.OLLAMA_CLOUD_KEY }}
-        run: |
-          COMMITS="${{ steps.commits.outputs.commits }}"
 
-          PROMPT=$(cat <<'PROMPTEOF'
-          You are a release notes generator for a cross-platform desktop drawing application (Electron + React + TypeScript).
-
-          Generate concise, user-friendly release notes from the following commit history.
-
-          Format as markdown with these sections:
-          ## What's New
-          - Group commits by category (Features, Fixes, Improvements, Docs, Chore)
-          - Use clear, non-technical language for end users
-          - Keep each bullet to one line
-
-          ## Downloads
-          - Windows: .exe installer and portable
-          - Linux: .AppImage and .deb
-
-          Commit history:
-          PROMPTEOF
+          LAST_TAG=$(
+            git describe \
+              --tags \
+              --abbrev=0 \
+              "${RELEASE_SHA}^" 2>/dev/null || true
           )
 
-          PAYLOAD=$(jq -n \
-            --arg model "gpt-oss:120b-cloud" \
-            --arg prompt "$PROMPT$COMMITS" \
-            --argjson stream false \
-            --argjson options '{"temperature": 0.3, "num_predict": 2048}' \
-            '{model: $model, prompt: $prompt, stream: $stream, options: $options}')
+          echo "Current release: $RELEASE_TAG"
 
-          RESPONSE=$(curl -s -X POST "https://api.ollama.com/api/generate" \
-            -H "Authorization: Bearer $OLLAMA_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
+          if [ -n "$LAST_TAG" ]; then
+            echo "Previous release: $LAST_TAG"
 
-          NOTES=$(echo "$RESPONSE" | jq -r '.response // empty')
-
-          if [ -z "$NOTES" ]; then
-            echo "⚠️ Ollama API returned empty response, falling back to auto-generated notes"
-            echo "notes=Auto-generated release notes for ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            git log \
+              --no-renames \
+              --pretty=format:'- %s (%an)' \
+              "${LAST_TAG}..${RELEASE_SHA}" \
+              > "$COMMITS_FILE"
           else
-            # Escape for GitHub output
-            echo "$NOTES" | sed 's/%/%25/g; s/\n/%0A/g; s/\r/%0D/g' > /tmp/notes_encoded.txt
-            {
-              echo "notes<<EOF"
-              cat /tmp/notes_encoded.txt
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
+            echo "No previous tag found. Using available commit history."
+
+            git log \
+              --no-renames \
+              --pretty=format:'- %s (%an)' \
+              "$RELEASE_SHA" \
+              > "$COMMITS_FILE"
           fi
 
+          if [ ! -s "$COMMITS_FILE" ]; then
+            printf '%s\n' "No new commits were found for this release." \
+              > "$COMMITS_FILE"
+          fi
+
+          echo "Commit history:"
+          cat "$COMMITS_FILE"
+
+          # Always have usable release notes, even when the API fails.
+          cat > "$NOTES_FILE" <<EOF
+          ## What's New
+
+          Changes included in release $RELEASE_TAG.
+
+          See the commit history for details.
+
+          ## Downloads
+
+          Download the appropriate installer from the assets below.
+          EOF
+
+          # A missing API key must not prevent the release from being created.
+          if [ -z "${OLLAMA_API_KEY:-}" ]; then
+            echo "::warning::OLLAMA_CLOUD_KEY is not configured. Using fallback release notes."
+          else
+            PROMPT_FILE="$RUNNER_TEMP/release-prompt.txt"
+
+            cat > "$PROMPT_FILE" <<'PROMPT'
+          You write release notes for an Electron desktop drawing application built with React and TypeScript.
+
+          Create concise, accurate, user-friendly Markdown release notes based ONLY on the supplied commit history.
+
+          Requirements:
+          - Use the heading "## What's New".
+          - Group changes under short subheadings when useful, such as Features, Fixes, and Improvements.
+          - Explain changes in language understandable to end users.
+          - Keep each bullet concise.
+          - Do not invent features, fixes, or other changes.
+          - Exclude internal maintenance changes unless they matter to users.
+          - Do not include a Downloads section; it will be added separately.
+          - If the history contains no meaningful user-facing changes, say so briefly.
+          - Return Markdown only, without a preamble or code fences.
+
+          Commit history:
+          PROMPT
+
+            printf '\n' >> "$PROMPT_FILE"
+            cat "$COMMITS_FILE" >> "$PROMPT_FILE"
+
+            PROMPT="$(cat "$PROMPT_FILE")"
+
+            PAYLOAD="$(
+              jq -n \
+                --arg model "gpt-oss:120b-cloud" \
+                --arg prompt "$PROMPT" \
+                '{
+                  model: $model,
+                  messages: [
+                    {
+                      role: "user",
+                      content: $prompt
+                    }
+                  ],
+                  stream: false,
+                  options: {
+                    temperature: 0.3,
+                    num_predict: 2048
+                  }
+                }'
+            )"
+
+            echo "Requesting release notes from Ollama Cloud..."
+
+            if curl \
+              --silent \
+              --show-error \
+              --fail-with-body \
+              --connect-timeout 10 \
+              --max-time 120 \
+              --retry 2 \
+              --retry-delay 2 \
+              -X POST "https://ollama.com/api/chat" \
+              -H "Authorization: Bearer $OLLAMA_API_KEY" \
+              -H "Content-Type: application/json" \
+              --data-binary "$PAYLOAD" \
+              --output "$RESPONSE_FILE"; then
+
+              NOTES="$(
+                jq -er '
+                  .message.content
+                  | select(type == "string")
+                  | select(length > 0)
+                ' "$RESPONSE_FILE" 2>/dev/null || true
+              )"
+
+              if [ -n "$NOTES" ]; then
+                printf '%s\n' "$NOTES" > "$NOTES_FILE"
+                echo "Successfully generated AI release notes."
+              else
+                echo "::warning::Ollama returned an invalid or empty response. Using fallback release notes."
+              fi
+            else
+              echo "::warning::Ollama API request failed. Using fallback release notes."
+
+              if [ -s "$RESPONSE_FILE" ]; then
+                echo "Ollama error response:"
+                head -c 2000 "$RESPONSE_FILE" || true
+                echo
+              fi
+            fi
+          fi
+
+          # Add download instructions based on the supported build targets.
+          cat >> "$NOTES_FILE" <<'EOF'
+
+          ## Downloads
+
+          - **Windows:** Download the `.exe` installer.
+          - **Linux:** Download the `.AppImage` or `.deb` package, as available.
+          EOF
+
+          echo "Final release notes:"
+          cat "$NOTES_FILE"
+
+          # Use a unique delimiter to safely support multiline Markdown.
+          DELIMITER="RELEASE_NOTES_$(openssl rand -hex 16)"
+
+          {
+            echo "notes<<$DELIMITER"
+            cat "$NOTES_FILE"
+            echo
+            echo "$DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+
   release:
-    name: Create Release
-    needs: [build, generate-release-notes]
+    name: Create GitHub Release
+    needs:
+      - build
+      - generate-release-notes
+
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
+
     steps:
-      - name: Download all artifacts
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: List artifacts
+      - name: Validate release artifacts
+        shell: bash
         run: |
-          find artifacts -type f -name "*" | sort
+          set -euo pipefail
 
-      - name: Create Release
+          if [ ! -d artifacts ]; then
+            echo "::error::The artifacts directory does not exist."
+            exit 1
+          fi
+
+          echo "Downloaded files:"
+          find artifacts -maxdepth 1 -type f -print | sort
+
+          if ! find artifacts -maxdepth 1 -type f -print -quit | grep -q .; then
+            echo "::error::No release artifacts were downloaded."
+            exit 1
+          fi
+
+          echo "Artifact validation successful."
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          name: Release ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name, '-') }}
           body: ${{ needs.generate-release-notes.outputs.release_notes }}
-          files: |
-            artifacts/*
+          files: artifacts/*
+          fail_on_unmatched_files: true
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
