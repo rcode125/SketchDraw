@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { SketchCanvas } from './features/canvas/SketchCanvas'
-import { ColorPicker } from './features/canvas/ColorPicker'
-import { ToolPicker } from './features/canvas/ToolPicker'
+import { Toolbar } from './components/Toolbar'
+import { Sidebar } from './components/Sidebar'
+import { StatusBar } from './components/StatusBar'
 import { useUiStore } from './app/state/uiStore'
 import './App.css'
 
@@ -11,9 +12,10 @@ export const App = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      const width = window.innerWidth - 40
-      const height = window.innerHeight - 160
-      setCanvasSize({ width, height })
+      const sidebarWidth = useUiStore.getState().sidebarCollapsed ? 56 : 280
+      const width = window.innerWidth - sidebarWidth - 48
+      const height = window.innerHeight - 56 - 32 - 48
+      setCanvasSize({ width: Math.max(400, width), height: Math.max(300, height) })
     }
     handleResize()
     window.addEventListener('resize', handleResize)
@@ -25,15 +27,13 @@ export const App = () => {
   }, [canvasSize, setCanvasSizeStore])
 
   return (
-    <div className="workspace">
-      <header className="workspace__header">
-        <h1>SketchDraw</h1>
-      </header>
-      <ToolPicker />
-      <div className="workspace__canvas">
+    <div className="app">
+      <Toolbar />
+      <div className="app__main">
+        <Sidebar />
         <SketchCanvas width={canvasSize.width} height={canvasSize.height} />
       </div>
-      <ColorPicker />
+      <StatusBar />
     </div>
   )
 }
