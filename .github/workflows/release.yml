@@ -79,50 +79,103 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build application
-        run: npm run "${{ matrix.build_script }}"
+        - name: Build application
+          run: npm run "${{ matrix.build_script }}"
 
-      - name: Validate build artifacts
-        shell: bash
-        env:
-          ASSET_PATTERNS: ${{ matrix.asset_pattern }}
-        run: |
-          set -euo pipefail
+        - name: Debug build output
+          shell: bash
+          run: |
+            echo "Current directory:"
+            pwd
 
-          if [ ! -d dist ]; then
-            echo "::error::The dist directory does not exist."
-            exit 1
-          fi
+            echo "Available build directories:"
+            find . -maxdepth 4 -type d \
+              \( -name dist -o -name release -o -name out -o -name build \) \
+              -not -path './node_modules/*' \
+              -print
 
-          shopt -s nullglob
+            echo "Generated installer files:"
+            find . -type f \
+              \( -iname '*.exe' -o -iname '*.AppImage' -o -iname '*.deb' \) \
+              -not -path './node_modules/*' \
+              -not -path './.git/*' \
+              -print
 
-          found=0
+        - name: Collect Windows artifacts
+          if: runner.os == 'Windows'
+          shell: bash
+          run: |
+            set -euo pipefail
 
-          while IFS= read -r pattern; do
-            [ -n "$pattern" ] || continue
+            mkdir -p dist
 
-            # Expand the expected file pattern.
-            matches=( $pattern )
+            echo "Searching for generated Windows executables..."
 
-            if [ "${#matches[@]}" -eq 0 ]; then
-              echo "::error::No build artifacts found for pattern: $pattern"
+            while IFS= read -r -d '' file; do
+              destination="dist/$(basename \"$file\")"
+
+              # Avoid copying files onto themselves.
+              if [ "$(realpath \"$file\")" != "$(realpath -m \"$destination\")" ]; then
+                cp "$file" "$destination"
+                echo "Collected: $file -> $destination"
+              fi
+            done < <(
+              find . \
+                -type f \
+                -iname '*.exe' \
+                -not -path './node_modules/*' \
+                -not -path './.git/*' \
+                -not -path './dist/*' \
+                -print0
+            )
+
+            echo "Collected executables:"
+            find dist -maxdepth 1 -type f -iname '*.exe' -print
+
+            if ! find dist -maxdepth 1 -type f -iname '*.exe' -print -quit | grep -q .; then
+              echo "::error::No Windows executables were generated anywhere in the repository."
               exit 1
             fi
 
-            for file in "${matches[@]}"; do
-              if [ -f "$file" ]; then
-                echo "Found artifact: $file"
-                found=$((found + 1))
+        - name: Validate build artifacts
+          shell: bash
+          env:
+            ASSET_PATTERNS: ${{ matrix.asset_pattern }}
+          run: |
+            set -euo pipefail
+
+            if [ ! -d dist ]; then
+              echo "::error::The dist directory does not exist."
+              exit 1
+            fi
+
+            shopt -s nullglob
+            found=0
+
+            while IFS= read -r pattern; do
+              [ -n "$pattern" ] || continue
+
+              matches=( $pattern )
+
+              if [ "${#matches[@]}" -eq 0 ]; then
+                echo "::error::No build artifacts found for pattern: $pattern"
+                exit 1
               fi
-            done
-          done <<< "$ASSET_PATTERNS"
 
-          if [ "$found" -eq 0 ]; then
-            echo "::error::The build produced no valid release artifacts."
-            exit 1
-          fi
+              for file in "${matches[@]}"; do
+                if [ -f "$file" ]; then
+                  echo "Found artifact: $file"
+                  found=$((found + 1))
+                fi
+              done
+            done <<< "$ASSET_PATTERNS"
 
-          echo "Validated $found artifact(s)."
+            if [ "$found" -eq 0 ]; then
+              echo "::error::No valid release artifacts found."
+              exit 1
+            fi
+
+            echo "Validated $found artifact(s)."
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
