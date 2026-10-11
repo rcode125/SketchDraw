@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type DrawingTool = 'pencil' | 'brush' | 'charcoal' | 'marker' | 'eraser'
+export type DrawingTool = 'pencil' | 'brush' | 'charcoal' | 'marker' | 'eraser' | 'select' | 'pan'
 
 export interface Point {
   x: number

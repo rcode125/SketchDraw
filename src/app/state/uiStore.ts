@@ -11,6 +11,11 @@ interface UiState {
   colorPickerCollapsed: boolean
   setColorPickerCollapsed: (collapsed: boolean) => void
   toggleColorPicker: () => void
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (collapsed: boolean) => void
+  toggleSidebar: () => void
+  activeSidebarTab: 'tools' | 'layers' | 'properties'
+  setActiveSidebarTab: (tab: 'tools' | 'layers' | 'properties') => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -19,4 +24,9 @@ export const useUiStore = create<UiState>((set) => ({
   colorPickerCollapsed: false,
   setColorPickerCollapsed: (colorPickerCollapsed) => set({ colorPickerCollapsed }),
   toggleColorPicker: () => set((state) => ({ colorPickerCollapsed: !state.colorPickerCollapsed })),
+  sidebarCollapsed: false,
+  setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+  toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  activeSidebarTab: 'tools',
+  setActiveSidebarTab: (activeSidebarTab) => set({ activeSidebarTab }),
 }))
