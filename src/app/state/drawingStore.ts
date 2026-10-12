@@ -80,4 +80,10 @@ export const useDrawingStore = create<DrawingState>((set, get) => ({
   clearStrokes: () => {
     set({ strokes: [], currentStroke: null })
   },
+  undoLastStroke: () => {
+    set((state) => ({ strokes: state.strokes.slice(0, -1) }))
+  },
+  redoLastStroke: () => {
+    // redo functionality not implemented yet
+  },
 }))
