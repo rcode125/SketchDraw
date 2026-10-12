@@ -130,23 +130,22 @@ export const useCanvasSurface = (
 
   // Handle pointer events for drawing
   useEffect(() => {
-        const handlePointerDown = (event: PointerEvent) => {
-          const canvas = canvasRef.current
-          if (!canvas) return
-          // Only respond to primary pointer (left mouse, pen tip, etc.)
-          if (event.button !== 0) return
+    const handlePointerDown = (event: PointerEvent) => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      // Only respond to primary pointer (left mouse, pen tip, etc.)
+      if (event.button !== 0) return
 
-          // Do not start drawing when tool is select or pan
-          const currentTool = useDrawingStore.getState().tool
-          if (currentTool === 'select' || currentTool === 'pan') return
+      // Do not start drawing when tool is select or pan
+      const currentTool = useDrawingStore.getState().tool
+      if (currentTool === 'select' || currentTool === 'pan') return
 
-          const rect = canvas.getBoundingClientRect()
-          const x = event.clientX - rect.left
-          const y = event.clientY - rect.top
+      const rect = canvas.getBoundingClientRect()
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
 
-          startStroke({ x, y })
-        }
-
+      startStroke({ x, y })
+    }
 
     const handlePointerMove = (event: PointerEvent) => {
       const canvas = canvasRef.current

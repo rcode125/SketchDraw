@@ -34,7 +34,7 @@ export interface DrawingState {
   endStroke: () => void
   clearStrokes: () => void
   undoLastStroke: () => void
-   redoLastStroke: () => void
+  redoLastStroke: () => void
 }
 
 export const useDrawingStore = create<DrawingState>((set, get) => ({
