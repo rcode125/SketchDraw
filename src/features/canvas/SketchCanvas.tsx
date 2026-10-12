@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from 'react'
 import { useUiStore } from '../../app/state/uiStore'
+import { useCanvasSurface } from './useCanvasSurface'
 
 interface SketchCanvasProps {
   width: number

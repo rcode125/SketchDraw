@@ -99,7 +99,7 @@ export const Toolbar = () => {
 
         <div className="btn-group" role="group" aria-label="Edit actions">
           <button className="btn btn--icon btn--ghost" aria-label="Undo (Ctrl+Z)" onClick={() => {
-            const undo = useDrawingStore.getState().undoLastStroke
+    const undo = useDrawingStore.getState().undoLastStroke
             undo()
           }}>
             <svg
