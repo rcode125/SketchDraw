@@ -73,109 +73,153 @@ jobs:
 
           node --version
           npm --version
-
           npm run
 
       - name: Install dependencies
         run: npm ci
 
-        - name: Build application
-          run: npm run "${{ matrix.build_script }}"
+      - name: Build application
+        shell: bash
+        run: npm run "${{ matrix.build_script }}"
 
-        - name: Debug build output
-          shell: bash
-          run: |
-            echo "Current directory:"
-            pwd
+      - name: Debug build output
+        shell: bash
+        run: |
+          set -euo pipefail
 
-            echo "Available build directories:"
-            find . -maxdepth 4 -type d \
-              \( -name dist -o -name release -o -name out -o -name build \) \
-              -not -path './node_modules/*' \
-              -print
+          echo "Current directory:"
+          pwd
 
-            echo "Generated installer files:"
-            find . -type f \
-              \( -iname '*.exe' -o -iname '*.AppImage' -o -iname '*.deb' \) \
+          echo "Available build directories:"
+          find . -maxdepth 4 -type d \
+            \( -name dist -o -name release -o -name out -o -name build \) \
+            -not -path './node_modules/*' \
+            -not -path './.git/*' \
+            -print
+
+          echo "Generated installer files:"
+          find . -type f \
+            \( -iname '*.exe' -o -iname '*.AppImage' -o -iname '*.deb' \) \
+            -not -path './node_modules/*' \
+            -not -path './.git/*' \
+            -print
+
+      - name: Collect Windows artifacts
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p release
+
+          echo "Searching for generated Windows executables..."
+
+          while IFS= read -r -d '' file; do
+            destination="release/$(basename "$file")"
+
+            # Do not copy a file onto itself.
+            if [ "$(realpath "$file")" != "$(realpath -m "$destination")" ]; then
+              cp "$file" "$destination"
+              echo "Collected: $file -> $destination"
+            fi
+          done < <(
+            find . \
+              -type f \
+              -iname '*.exe' \
               -not -path './node_modules/*' \
               -not -path './.git/*' \
-              -print
+              -not -path './release/*' \
+              -print0
+          )
 
-        - name: Collect Windows artifacts
-          if: runner.os == 'Windows'
-          shell: bash
-          run: |
-            set -euo pipefail
+          echo "Collected Windows executables:"
+          find release -maxdepth 1 -type f -iname '*.exe' -print
 
-            mkdir -p release
+          if ! find release -maxdepth 1 -type f -iname '*.exe' -print -quit | grep -q .; then
+            echo "::error::No Windows executables were generated."
+            exit 1
+          fi
 
-            echo "Searching for generated Windows executables..."
+      - name: Collect Linux artifacts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
 
-            while IFS= read -r -d '' file; do
-              destination="release/$(basename \"$file\")"
+          mkdir -p release
 
-              # Avoid copying files onto themselves.
-              if [ "$(realpath \"$file\")" != "$(realpath -m \"$destination\")" ]; then
-                cp "$file" "$destination"
-                echo "Collected: $file -> $destination"
+          echo "Searching for generated Linux installers..."
+
+          while IFS= read -r -d '' file; do
+            destination="release/$(basename "$file")"
+
+            # Do not copy a file onto itself.
+            if [ "$(realpath "$file")" != "$(realpath -m "$destination")" ]; then
+              cp "$file" "$destination"
+              echo "Collected: $file -> $destination"
+            fi
+          done < <(
+            find . \
+              -type f \
+              \( -iname '*.AppImage' -o -iname '*.deb' \) \
+              -not -path './node_modules/*' \
+              -not -path './.git/*' \
+              -not -path './release/*' \
+              -print0
+          )
+
+          echo "Collected Linux installers:"
+          find release -maxdepth 1 -type f \
+            \( -iname '*.AppImage' -o -iname '*.deb' \) \
+            -print
+
+          if ! find release -maxdepth 1 -type f \
+            \( -iname '*.AppImage' -o -iname '*.deb' \) \
+            -print -quit | grep -q .; then
+            echo "::error::No Linux installers were generated."
+            exit 1
+          fi
+
+      - name: Validate build artifacts
+        shell: bash
+        env:
+          ASSET_PATTERNS: ${{ matrix.asset_pattern }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -d release ]; then
+            echo "::error::The release directory does not exist."
+            exit 1
+          fi
+
+          shopt -s nullglob
+
+          found=0
+
+          while IFS= read -r pattern; do
+            [ -n "$pattern" ] || continue
+
+            matches=( $pattern )
+
+            if [ "${#matches[@]}" -eq 0 ]; then
+              echo "::error::No build artifacts found for pattern: $pattern"
+              exit 1
+            fi
+
+            for file in "${matches[@]}"; do
+              if [ -f "$file" ]; then
+                echo "Found artifact: $file"
+                found=$((found + 1))
               fi
-            done < <(
-              find . \
-                -type f \
-                -iname '*.exe' \
-                -not -path './node_modules/*' \
-                -not -path './.git/*' \
-                -not -path './release/*' \
-                -print0
-            )
+            done
+          done <<< "$ASSET_PATTERNS"
 
-            echo "Collected executables:"
-            find release -maxdepth 1 -type f -iname '*.exe' -print
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No valid release artifacts found."
+            exit 1
+          fi
 
-            if ! find release -maxdepth 1 -type f -iname '*.exe' -print -quit | grep -q .; then
-              echo "::error::No Windows executables were generated anywhere in the repository."
-              exit 1
-            fi
-
-        - name: Validate build artifacts
-          shell: bash
-          env:
-            ASSET_PATTERNS: ${{ matrix.asset_pattern }}
-          run: |
-            set -euo pipefail
-
-            if [ ! -d release ]; then
-              echo "::error::The release directory does not exist."
-              exit 1
-            fi
-
-            shopt -s nullglob
-            found=0
-
-            while IFS= read -r pattern; do
-              [ -n "$pattern" ] || continue
-
-              matches=( $pattern )
-
-              if [ "${#matches[@]}" -eq 0 ]; then
-                echo "::error::No build artifacts found for pattern: $pattern"
-                exit 1
-              fi
-
-              for file in "${matches[@]}"; do
-                if [ -f "$file" ]; then
-                  echo "Found artifact: $file"
-                  found=$((found + 1))
-                fi
-              done
-            done <<< "$ASSET_PATTERNS"
-
-            if [ "$found" -eq 0 ]; then
-              echo "::error::No valid release artifacts found."
-              exit 1
-            fi
-
-            echo "Validated $found artifact(s)."
+          echo "Validated $found artifact(s)."
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -217,9 +261,7 @@ jobs:
           COMMITS_FILE="$RUNNER_TEMP/commits.txt"
           RESPONSE_FILE="$RUNNER_TEMP/ollama-response.json"
 
-          # Find the previous reachable tag.
-          LAST_TAG=""
-
+          # Fetch the manually selected release tag when necessary.
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             git fetch --force origin \
               "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
@@ -227,6 +269,7 @@ jobs:
             RELEASE_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
           fi
 
+          # Find the previous reachable tag.
           LAST_TAG=$(
             git describe \
               --tags \
@@ -262,20 +305,16 @@ jobs:
           echo "Commit history:"
           cat "$COMMITS_FILE"
 
-          # Always have usable release notes, even when the API fails.
+          # Create fallback notes before attempting the API request.
           cat > "$NOTES_FILE" <<EOF
           ## What's New
 
           Changes included in release $RELEASE_TAG.
 
           See the commit history for details.
-
-          ## Downloads
-
-          Download the appropriate installer from the assets below.
           EOF
 
-          # A missing API key must not prevent the release from being created.
+          # A missing API key must not prevent the release.
           if [ -z "${OLLAMA_API_KEY:-}" ]; then
             echo "::warning::OLLAMA_CLOUD_KEY is not configured. Using fallback release notes."
           else
@@ -366,7 +405,7 @@ jobs:
             fi
           fi
 
-          # Add download instructions based on the supported build targets.
+          # Append platform-specific download instructions.
           cat >> "$NOTES_FILE" <<'EOF'
 
           ## Downloads
@@ -378,7 +417,7 @@ jobs:
           echo "Final release notes:"
           cat "$NOTES_FILE"
 
-          # Use a unique delimiter to safely support multiline Markdown.
+          # Safely export multiline Markdown to GitHub Actions.
           DELIMITER="RELEASE_NOTES_$(openssl rand -hex 16)"
 
           {
