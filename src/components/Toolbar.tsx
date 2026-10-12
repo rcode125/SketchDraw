@@ -132,7 +132,7 @@ export const Toolbar = () => {
         <div className="app__toolbar-divider" role="separator" />
 
         <div className="btn-group" role="group" aria-label="View actions">
-          <button className="btn btn--icon btn--ghost" aria-label="Zoom in (Ctrl+=)" onClick={() => alert('Zoom in')}>
+            <button className="btn btn--icon btn--ghost" aria-label="Zoom in (Ctrl+=)" onClick={useUiStore.getState().zoomIn}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -147,7 +147,7 @@ export const Toolbar = () => {
               <line x1="8" y1="11" x2="14" y2="11" />
             </svg>
           </button>
-          <button className="btn btn--icon btn--ghost" aria-label="Zoom out (Ctrl+-)" onClick={() => alert('Zoom out')}>
+            <button className="btn btn--icon btn--ghost" aria-label="Zoom out (Ctrl+-)" onClick={useUiStore.getState().zoomOut}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -161,7 +161,7 @@ export const Toolbar = () => {
               <line x1="8" y1="11" x2="14" y2="11" />
             </svg>
           </button>
-          <button className="btn btn--icon btn--ghost" aria-label="Fit to screen (Ctrl+0)" onClick={() => alert('Fit to screen')}>
+            <button className="btn btn--icon btn--ghost" aria-label="Fit to screen (Ctrl+0)" onClick={useUiStore.getState().fitToScreen}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
