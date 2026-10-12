@@ -1,4 +1,5 @@
 import { useUiStore } from '../app/state/uiStore'
+import { useDrawingStore } from '../app/state/drawingStore'
 
 export const Toolbar = () => {
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed)
@@ -48,7 +49,10 @@ export const Toolbar = () => {
 
       <div className="app__toolbar-actions">
         <div className="btn-group" role="group" aria-label="File actions">
-          <button className="btn btn--icon btn--ghost" aria-label="New document (Ctrl+N)">
+          <button className="btn btn--icon btn--ghost" aria-label="New document (Ctrl+N)" onClick={() => {
+            const clear = useDrawingStore.getState().clearStrokes
+            clear()
+          }}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -63,7 +67,7 @@ export const Toolbar = () => {
               <line x1="9" y1="15" x2="15" y2="15" />
             </svg>
           </button>
-          <button className="btn btn--icon btn--ghost" aria-label="Open document (Ctrl+O)">
+          <button className="btn btn--icon btn--ghost" aria-label="Open document (Ctrl+O)" onClick={() => alert('Open not implemented')}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -75,7 +79,7 @@ export const Toolbar = () => {
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
           </button>
-          <button className="btn btn--icon btn--ghost" aria-label="Save document (Ctrl+S)">
+          <button className="btn btn--icon btn--ghost" aria-label="Save document (Ctrl+S)" onClick={() => alert('Save not implemented')}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -94,7 +98,10 @@ export const Toolbar = () => {
         <div className="app__toolbar-divider" role="separator" />
 
         <div className="btn-group" role="group" aria-label="Edit actions">
-          <button className="btn btn--icon btn--ghost" aria-label="Undo (Ctrl+Z)">
+          <button className="btn btn--icon btn--ghost" aria-label="Undo (Ctrl+Z)" onClick={() => {
+            const undo = useDrawingStore.getState().undoLastStroke
+            undo()
+          }}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -107,7 +114,7 @@ export const Toolbar = () => {
               <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
             </svg>
           </button>
-          <button className="btn btn--icon btn--ghost" aria-label="Redo (Ctrl+Shift+Z)">
+          <button className="btn btn--icon btn--ghost" aria-label="Redo (Ctrl+Shift+Z)" onClick={() => alert('Redo not implemented')}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -125,7 +132,7 @@ export const Toolbar = () => {
         <div className="app__toolbar-divider" role="separator" />
 
         <div className="btn-group" role="group" aria-label="View actions">
-          <button className="btn btn--icon btn--ghost" aria-label="Zoom in (Ctrl+=)">
+          <button className="btn btn--icon btn--ghost" aria-label="Zoom in (Ctrl+=)" onClick={() => alert('Zoom in')}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -140,7 +147,7 @@ export const Toolbar = () => {
               <line x1="8" y1="11" x2="14" y2="11" />
             </svg>
           </button>
-          <button className="btn btn--icon btn--ghost" aria-label="Zoom out (Ctrl+-">
+          <button className="btn btn--icon btn--ghost" aria-label="Zoom out (Ctrl+-)" onClick={() => alert('Zoom out')}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -154,7 +161,7 @@ export const Toolbar = () => {
               <line x1="8" y1="11" x2="14" y2="11" />
             </svg>
           </button>
-          <button className="btn btn--icon btn--ghost" aria-label="Fit to screen (Ctrl+0)">
+          <button className="btn btn--icon btn--ghost" aria-label="Fit to screen (Ctrl+0)" onClick={() => alert('Fit to screen')}>
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -171,7 +178,7 @@ export const Toolbar = () => {
 
         <div className="app__toolbar-divider" role="separator" />
 
-        <button className="btn btn--icon btn--ghost" aria-label="Settings (Ctrl+,)">
+          <button className="btn btn--icon btn--ghost" aria-label="Settings (Ctrl+,)" onClick={() => alert('Settings')}>
           <svg
             viewBox="0 0 24 24"
             fill="none"
