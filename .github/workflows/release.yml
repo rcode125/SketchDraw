@@ -67,7 +67,7 @@ jobs:
           fi
 
           if [ ! -f package-lock.json ]; then
-            echo "::error::package-lock.json is missing. npm ci requires a lockfile."
+            echo "::error::package-lock.json is missing."
             exit 1
           fi
 
@@ -90,18 +90,19 @@ jobs:
           echo "Current directory:"
           pwd
 
-          echo "Available build directories:"
+          echo "Build directories:"
           find . -maxdepth 4 -type d \
-            \( -name dist -o -name release -o -name out -o -name build \) \
+            \( -name dist -o -name release -o -name out -o -name build -o -name dist_electron \) \
             -not -path './node_modules/*' \
             -not -path './.git/*' \
             -print
 
-          echo "Generated installer files:"
+          echo "Installer files:"
           find . -type f \
             \( -iname '*.exe' -o -iname '*.AppImage' -o -iname '*.deb' \) \
             -not -path './node_modules/*' \
             -not -path './.git/*' \
+            -not -path './release/*' \
             -print
 
       - name: Collect Windows artifacts
@@ -112,19 +113,21 @@ jobs:
 
           mkdir -p release
 
-          echo "Searching for generated Windows executables..."
-
           while IFS= read -r -d '' file; do
-            destination="release/$(basename "$file")"
+            filename="$(basename "$file")"
+            destination="release/$filename"
 
-            # Do not copy a file onto itself.
             if [ "$(realpath "$file")" != "$(realpath -m "$destination")" ]; then
+              if [ -e "$destination" ]; then
+                echo "::error::Duplicate Windows installer filename: $filename"
+                exit 1
+              fi
+
               cp "$file" "$destination"
-              echo "Collected: $file -> $destination"
+              echo "Collected: $file"
             fi
           done < <(
-            find . \
-              -type f \
+            find . -type f \
               -iname '*.exe' \
               -not -path './node_modules/*' \
               -not -path './.git/*' \
@@ -132,13 +135,13 @@ jobs:
               -print0
           )
 
-          echo "Collected Windows executables:"
-          find release -maxdepth 1 -type f -iname '*.exe' -print
-
           if ! find release -maxdepth 1 -type f -iname '*.exe' -print -quit | grep -q .; then
-            echo "::error::No Windows executables were generated."
+            echo "::error::No Windows installer was generated."
             exit 1
           fi
+
+          echo "Windows installers:"
+          find release -maxdepth 1 -type f -iname '*.exe' -print
 
       - name: Collect Linux artifacts
         if: runner.os == 'Linux'
@@ -148,19 +151,21 @@ jobs:
 
           mkdir -p release
 
-          echo "Searching for generated Linux installers..."
-
           while IFS= read -r -d '' file; do
-            destination="release/$(basename "$file")"
+            filename="$(basename "$file")"
+            destination="release/$filename"
 
-            # Do not copy a file onto itself.
             if [ "$(realpath "$file")" != "$(realpath -m "$destination")" ]; then
+              if [ -e "$destination" ]; then
+                echo "::error::Duplicate Linux installer filename: $filename"
+                exit 1
+              fi
+
               cp "$file" "$destination"
-              echo "Collected: $file -> $destination"
+              echo "Collected: $file"
             fi
           done < <(
-            find . \
-              -type f \
+            find . -type f \
               \( -iname '*.AppImage' -o -iname '*.deb' \) \
               -not -path './node_modules/*' \
               -not -path './.git/*' \
@@ -168,17 +173,17 @@ jobs:
               -print0
           )
 
-          echo "Collected Linux installers:"
-          find release -maxdepth 1 -type f \
-            \( -iname '*.AppImage' -o -iname '*.deb' \) \
-            -print
-
           if ! find release -maxdepth 1 -type f \
             \( -iname '*.AppImage' -o -iname '*.deb' \) \
             -print -quit | grep -q .; then
             echo "::error::No Linux installers were generated."
             exit 1
           fi
+
+          echo "Linux installers:"
+          find release -maxdepth 1 -type f \
+            \( -iname '*.AppImage' -o -iname '*.deb' \) \
+            -print
 
       - name: Validate build artifacts
         shell: bash
@@ -208,7 +213,7 @@ jobs:
 
             for file in "${matches[@]}"; do
               if [ -f "$file" ]; then
-                echo "Found artifact: $file"
+                echo "Validated: $file"
                 found=$((found + 1))
               fi
             done
@@ -219,7 +224,7 @@ jobs:
             exit 1
           fi
 
-          echo "Validated $found artifact(s)."
+          echo "Successfully validated $found artifact(s)."
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -261,7 +266,6 @@ jobs:
           COMMITS_FILE="$RUNNER_TEMP/commits.txt"
           RESPONSE_FILE="$RUNNER_TEMP/ollama-response.json"
 
-          # Fetch the manually selected release tag when necessary.
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             git fetch --force origin \
               "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
@@ -269,13 +273,12 @@ jobs:
             RELEASE_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
           fi
 
-          # Find the previous reachable tag.
-          LAST_TAG=$(
+          LAST_TAG="$(
             git describe \
               --tags \
               --abbrev=0 \
               "${RELEASE_SHA}^" 2>/dev/null || true
-          )
+          )"
 
           echo "Current release: $RELEASE_TAG"
 
@@ -288,7 +291,7 @@ jobs:
               "${LAST_TAG}..${RELEASE_SHA}" \
               > "$COMMITS_FILE"
           else
-            echo "No previous tag found. Using available commit history."
+            echo "No previous tag found."
 
             git log \
               --no-renames \
@@ -302,10 +305,6 @@ jobs:
               > "$COMMITS_FILE"
           fi
 
-          echo "Commit history:"
-          cat "$COMMITS_FILE"
-
-          # Create fallback notes before attempting the API request.
           cat > "$NOTES_FILE" <<EOF
           ## What's New
 
@@ -314,9 +313,8 @@ jobs:
           See the commit history for details.
           EOF
 
-          # A missing API key must not prevent the release.
           if [ -z "${OLLAMA_API_KEY:-}" ]; then
-            echo "::warning::OLLAMA_CLOUD_KEY is not configured. Using fallback release notes."
+            echo "::warning::OLLAMA_CLOUD_KEY is missing. Using fallback release notes."
           else
             PROMPT_FILE="$RUNNER_TEMP/release-prompt.txt"
 
@@ -327,12 +325,12 @@ jobs:
 
           Requirements:
           - Use the heading "## What's New".
-          - Group changes under short subheadings when useful, such as Features, Fixes, and Improvements.
+          - Group changes under short subheadings when useful.
           - Explain changes in language understandable to end users.
           - Keep each bullet concise.
           - Do not invent features, fixes, or other changes.
           - Exclude internal maintenance changes unless they matter to users.
-          - Do not include a Downloads section; it will be added separately.
+          - Do not include a Downloads section.
           - If the history contains no meaningful user-facing changes, say so briefly.
           - Return Markdown only, without a preamble or code fences.
 
@@ -390,22 +388,20 @@ jobs:
 
               if [ -n "$NOTES" ]; then
                 printf '%s\n' "$NOTES" > "$NOTES_FILE"
-                echo "Successfully generated AI release notes."
+                echo "AI release notes generated successfully."
               else
-                echo "::warning::Ollama returned an invalid or empty response. Using fallback release notes."
+                echo "::warning::Invalid Ollama response. Using fallback notes."
               fi
             else
-              echo "::warning::Ollama API request failed. Using fallback release notes."
+              echo "::warning::Ollama request failed. Using fallback notes."
 
               if [ -s "$RESPONSE_FILE" ]; then
-                echo "Ollama error response:"
                 head -c 2000 "$RESPONSE_FILE" || true
                 echo
               fi
             fi
           fi
 
-          # Append platform-specific download instructions.
           cat >> "$NOTES_FILE" <<'EOF'
 
           ## Downloads
@@ -417,7 +413,6 @@ jobs:
           echo "Final release notes:"
           cat "$NOTES_FILE"
 
-          # Safely export multiline Markdown to GitHub Actions.
           DELIMITER="RELEASE_NOTES_$(openssl rand -hex 16)"
 
           {
