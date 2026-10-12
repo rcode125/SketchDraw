@@ -45,13 +45,10 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
         setPan({ x: newPanX, y: newPanY })
       } else {
         e.preventDefault()
-        setPan((prev) => ({
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY,
-        }))
+        setPan({ x: pan.x - e.deltaX, y: pan.y - e.deltaY })
       }
     },
-    [pan, zoom],
+    [pan, zoom, setPan, setZoom],
   )
 
   const handleMouseMove = useCallback(
