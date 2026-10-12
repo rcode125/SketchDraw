@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback } from 'react'
+import { useUiStore } from '../../app/state/uiStore'
 import { useCanvasSurface } from './useCanvasSurface'
 
 interface SketchCanvasProps {
@@ -10,8 +11,16 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
 
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const { zoom, pan, setZoom, setPan, zoomIn, zoomOut, resetZoom, fitToScreen } = useUiStore((state) => ({
+    zoom: state.zoom,
+    pan: state.pan,
+    setZoom: state.setZoom,
+    setPan: state.setPan,
+    zoomIn: state.zoomIn,
+    zoomOut: state.zoomOut,
+    resetZoom: state.resetZoom,
+    fitToScreen: state.fitToScreen,
+  }))
   const [showRulers] = useState(true)
 
   useCanvasSurface(canvasRef, { width, height })
@@ -36,13 +45,10 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
         setPan({ x: newPanX, y: newPanY })
       } else {
         e.preventDefault()
-        setPan((prev) => ({
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY,
-        }))
+        setPan({ x: pan.x - e.deltaX, y: pan.y - e.deltaY })
       }
     },
-    [pan, zoom],
+    [pan, zoom, setZoom, setPan],
   )
 
   const handleMouseMove = useCallback(
@@ -57,37 +63,10 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
       void x
       void y
     },
-    [pan, zoom],
+    [pan, zoom, setZoom, setPan],
   )
 
-  const zoomIn = useCallback(() => {
-    setZoom((prev) => Math.min(5, prev * 1.2))
-  }, [])
 
-  const zoomOut = useCallback(() => {
-    setZoom((prev) => Math.max(0.1, prev / 1.2))
-  }, [])
-
-  const resetZoom = useCallback(() => {
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
-  }, [])
-
-  const fitToScreen = useCallback(() => {
-    const wrapper = wrapperRef.current
-    if (!wrapper) return
-
-    const wrapperRect = wrapper.getBoundingClientRect()
-    const scaleX = (wrapperRect.width - 48) / width
-    const scaleY = (wrapperRect.height - 48) / height
-    const newZoom = Math.min(scaleX, scaleY, 1)
-
-    setZoom(newZoom)
-    setPan({
-      x: (wrapperRect.width - width * newZoom) / 2,
-      y: (wrapperRect.height - height * newZoom) / 2,
-    })
-  }, [width, height])
 
   const generateRulerMarks = (length: number) => {
     const marks = []
