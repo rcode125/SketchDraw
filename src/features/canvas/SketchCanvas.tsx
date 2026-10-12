@@ -11,16 +11,18 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
 
-  const { zoom, pan, setZoom, setPan, zoomIn, zoomOut, resetZoom, fitToScreen } = useUiStore((state) => ({
-    zoom: state.zoom,
-    pan: state.pan,
-    setZoom: state.setZoom,
-    setPan: state.setPan,
-    zoomIn: state.zoomIn,
-    zoomOut: state.zoomOut,
-    resetZoom: state.resetZoom,
-    fitToScreen: state.fitToScreen,
-  }))
+  const { zoom, pan, setZoom, setPan, zoomIn, zoomOut, resetZoom, fitToScreen } = useUiStore(
+    (state) => ({
+      zoom: state.zoom,
+      pan: state.pan,
+      setZoom: state.setZoom,
+      setPan: state.setPan,
+      zoomIn: state.zoomIn,
+      zoomOut: state.zoomOut,
+      resetZoom: state.resetZoom,
+      fitToScreen: state.fitToScreen,
+    }),
+  )
   const [showRulers] = useState(true)
 
   useCanvasSurface(canvasRef, { width, height })
@@ -65,8 +67,6 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
     },
     [pan, zoom],
   )
-
-
 
   const generateRulerMarks = (length: number) => {
     const marks = []

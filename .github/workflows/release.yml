@@ -3,12 +3,12 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (for example v1.2.0)"
+        description: 'Tag to release (for example v1.2.0)'
         required: true
         type: string
 
@@ -53,7 +53,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
           cache: npm
 
       - name: Verify project configuration

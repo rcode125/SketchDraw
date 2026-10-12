@@ -51,4 +51,3 @@ export const useUiStore = create<UiState>((set) => ({
     set({ zoom: 1, pan: { x: 0, y: 0 } })
   },
 }))
-
