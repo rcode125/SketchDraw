@@ -33,7 +33,7 @@ describe('drawingStore undo/redo', () => {
   test('clearStrokes resets redo stack', () => {
     // create a stroke and undo it
     act(() => {
-      const { startStroke, addPoint, endStroke, undoLastStroke, clearStrokes } = useDrawingStore.getState()
+      const { startStroke, addPoint, endStroke, undoLastStroke } = useDrawingStore.getState()
       startStroke({ x: 0, y: 0 })
       addPoint({ x: 5, y: 5 })
       endStroke()
@@ -45,6 +45,9 @@ describe('drawingStore undo/redo', () => {
       useDrawingStore.getState().clearStrokes()
     })
     expect(useDrawingStore.getState().strokes).toHaveLength(0)
+    expect(useDrawingStore.getState().redoStack).toHaveLength(0)
+  })
+
   test('multiple undo/redo maintains stack correctly', () => {
     // create three strokes
     act(() => {
@@ -82,4 +85,4 @@ describe('drawingStore undo/redo', () => {
     expect(useDrawingStore.getState().strokes).toHaveLength(3)
     expect(useDrawingStore.getState().redoStack).toHaveLength(0)
   })
-  })
+})

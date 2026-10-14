@@ -57,8 +57,8 @@ export const useUiStore = create<UiState>((set) => ({
       const panX = (window.innerWidth - width * scale) / 2
       const panY = (window.innerHeight - height * scale) / 2
 
-+      const clampedScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale))
-+      return { zoom: clampedScale, pan: { x: panX, y: panY } }
+      const clampedScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale))
+      return { zoom: clampedScale, pan: { x: panX, y: panY } }
     })
   },
 }))
