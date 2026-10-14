@@ -9,7 +9,7 @@
   "type": "module",
   "main": "dist-electron/index.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint . --max-warnings=0",
@@ -51,7 +51,9 @@
     "vite": "^8.3.0",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0"
   },
   "build": {
     "appId": "com.sketchdraw.app",

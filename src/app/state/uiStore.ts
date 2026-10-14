@@ -1,5 +1,9 @@
 import { create } from 'zustand'
 
+export const MIN_ZOOM = 0.1
+export const MAX_ZOOM = 5
+const ZOOM_MULTIPLIER = 1.2
+
 interface CanvasSize {
   width: number
   height: number
@@ -43,11 +47,23 @@ export const useUiStore = create<UiState>((set) => ({
   pan: { x: 0, y: 0 },
   setZoom: (zoom) => set({ zoom }),
   setPan: (pan) => set({ pan }),
-  zoomIn: () => set((state) => ({ zoom: Math.min(5, state.zoom * 1.2) })),
-  zoomOut: () => set((state) => ({ zoom: Math.max(0.1, state.zoom / 1.2) })),
+  zoomIn: () => set((state) => ({ zoom: Math.min(MAX_ZOOM, state.zoom * ZOOM_MULTIPLIER) })),
+  zoomOut: () => set((state) => ({ zoom: Math.max(MIN_ZOOM, state.zoom / ZOOM_MULTIPLIER) })),
   resetZoom: () => set({ zoom: 1, pan: { x: 0, y: 0 } }),
   fitToScreen: () => {
-    // Simple fit: reset zoom and center
-    set({ zoom: 1, pan: { x: 0, y: 0 } })
+    set((state) => {
+      const { width, height } = state.canvasSize
+      const scale = Math.min(window.innerWidth / width, window.innerHeight / height)
+      const panX = (window.innerWidth - width * scale) / 2
+      const panY = (window.innerHeight - height * scale) / 2
+
++      const clampedScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale))
++      return { zoom: clampedScale, pan: { x: panX, y: panY } }
+    })
   },
 }))
+
+
+
+
+

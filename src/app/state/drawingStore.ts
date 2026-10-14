@@ -15,6 +15,9 @@ export interface Stroke {
 }
 
 export interface DrawingState {
+  /** Stack of undone strokes for redo support */
+  redoStack: Stroke[]
+
   tool: DrawingTool
   color: string // current color
   size: number // current size
@@ -35,6 +38,7 @@ export interface DrawingState {
   clearStrokes: () => void
   undoLastStroke: () => void
   redoLastStroke: () => void
+
 }
 
 export const useDrawingStore = create<DrawingState>((set, get) => ({
@@ -42,6 +46,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => ({
   color: '#000000',
   size: 5,
   strokes: [],
+  redoStack: [],
   currentStroke: null,
   setTool: (tool) => set({ tool }),
   setColor: (color) => set({ color }),
@@ -76,16 +81,31 @@ export const useDrawingStore = create<DrawingState>((set, get) => ({
         return state
       }
       const newStrokes = [...state.strokes, state.currentStroke]
-      return { strokes: newStrokes, currentStroke: null }
+      return { strokes: newStrokes, currentStroke: null, redoStack: [] }
     })
   },
   clearStrokes: () => {
-    set({ strokes: [], currentStroke: null })
+    set({ strokes: [], currentStroke: null, redoStack: [] })
   },
   undoLastStroke: () => {
-    set((state) => ({ strokes: state.strokes.slice(0, -1) }))
+    set((state) => {
+      if (state.strokes.length === 0) return state
+      const popped = state.strokes[state.strokes.length - 1]!
+      return {
+        strokes: state.strokes.slice(0, -1),
+        redoStack: [...state.redoStack, popped],
+      }
+    })
   },
   redoLastStroke: () => {
-    // redo functionality not implemented yet
+    set((state) => {
+      if (state.redoStack.length === 0) return state
+      const restored = state.redoStack[state.redoStack.length - 1]!
+      const newRedoStack = state.redoStack.slice(0, -1)
+      return {
+        strokes: [...state.strokes, restored],
+        redoStack: newRedoStack,
+      }
+    })
   },
 }))

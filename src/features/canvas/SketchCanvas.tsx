@@ -1,5 +1,5 @@
-import { useRef, useState, useCallback } from 'react'
-import { useUiStore } from '../../app/state/uiStore'
+import { useRef, useState, useCallback, useMemo } from 'react'
+import { useUiStore, MIN_ZOOM, MAX_ZOOM } from '../../app/state/uiStore'
 import { useCanvasSurface } from './useCanvasSurface'
 
 interface SketchCanvasProps {
@@ -38,7 +38,7 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
         const mouseY = e.clientY - rect.top - pan.y
 
         const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1
-        const newZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor))
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * zoomFactor))
 
         const newPanX = e.clientX - rect.left - mouseX * (newZoom / zoom)
         const newPanY = e.clientY - rect.top - mouseY * (newZoom / zoom)
@@ -68,21 +68,17 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
     [pan, zoom],
   )
 
-  const generateRulerMarks = (length: number) => {
+  const generateRulerMarks = useMemo(() => (length: number) => {
     const marks = []
     const majorStep = 100
     const minorStep = 10
-
     for (let i = 0; i <= length; i += minorStep) {
       const isMajor = i % majorStep === 0
-      marks.push({
-        position: i,
-        isMajor,
-        label: isMajor ? `${i}` : '',
-      })
+      marks.push({ position: i, isMajor, label: isMajor ? `${i}` : '' })
     }
     return marks
-  }
+  }, []);
+
 
   const horizontalMarks = generateRulerMarks(width)
   const verticalMarks = generateRulerMarks(height)
@@ -105,7 +101,7 @@ export const SketchCanvas = ({ width, height }: SketchCanvasProps) => {
             height: `${height}px`,
           }}
         >
-          <canvas ref={canvasRef} aria-label="Sketch canvas" />
+            <canvas ref={canvasRef} aria-label="Sketch canvas" tabIndex={0} role="img" />
         </div>
       </div>
 

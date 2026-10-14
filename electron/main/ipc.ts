@@ -1,13 +1,11 @@
 import { ipcMain } from 'electron'
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
+// No payload expected for app:get-info; simply return static information
 
 export const registerIpcHandlers = (): void => {
-  ipcMain.handle('app:get-info', (_event, payload: unknown) => {
-    if (payload !== undefined && !isRecord(payload)) {
-      throw new Error('Invalid payload for app:get-info')
-    }
+  ipcMain.handle('app:get-info', () => {
+    // No validation needed – payload is ignored
+
 
     return {
       name: 'SketchDraw',
